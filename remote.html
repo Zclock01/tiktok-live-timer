@@ -1,19 +1,227 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Remote</title>
-<style>body{margin:0;background:#111;color:#fff;font-family:Arial;padding:18px}.wrap{max-width:520px;margin:auto}.time{text-align:center;font-size:58px;font-weight:900;margin:10px}.status{text-align:center;color:#aaa;margin-bottom:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}button{min-height:62px;border:0;border-radius:15px;background:#292929;color:#fff;font-size:21px;font-weight:800}button:active{transform:scale(.98)}.main{grid-column:1/-1;background:#444}input{box-sizing:border-box;width:100%;padding:15px;border-radius:12px;background:#222;color:#fff;border:1px solid #555;font-size:18px;margin-bottom:10px}</style></head><body><div class=wrap>
-<div class=time id=t>30:00</div><div class=status id=s>กำลังเชื่อมต่อ…</div>
-<input id=start type=number min=0 value=30><div class=grid>
-<button class=main id=reset>🔄 เริ่มใหม่ตามนาทีด้านบน</button>
-<button data-n=-60>− 1 นาที</button><button data-n=60>+ 1 นาที</button>
-<button data-n=-300>− 5 นาที</button><button data-n=300>+ 5 นาที</button>
-<button data-n=-10>− 10 วินาที</button><button data-n=10>+ 10 วินาที</button>
-<button class=main id=toggle>⏸ หยุดเวลา</button>
-</div></div>
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remote Timer</title>
+
+<style>
+body{
+  margin:0;
+  padding:20px;
+  background:#111;
+  color:#fff;
+  font-family:Arial,sans-serif;
+  text-align:center;
+}
+
+h1{
+  margin-top:10px;
+}
+
+#timer{
+  font-size:64px;
+  font-weight:900;
+  margin:25px 0;
+}
+
+button{
+  width:90%;
+  max-width:400px;
+  padding:18px;
+  margin:8px;
+  border:0;
+  border-radius:14px;
+  font-size:24px;
+  font-weight:900;
+}
+
+.add{
+  background:#22c55e;
+  color:#fff;
+}
+
+.minus{
+  background:#ef4444;
+  color:#fff;
+}
+
+.reset{
+  background:#555;
+  color:#fff;
+}
+
+.toggle{
+  background:#2563eb;
+  color:#fff;
+}
+
+#status{
+  margin-top:15px;
+  color:#aaa;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🎮 LIVE TIMER</h1>
+
+<div id="timer">30:00</div>
+
+<button class="add" onclick="addTime(60)">
++ 1 นาที
+</button>
+
+<button class="add" onclick="addTime(300)">
++ 5 นาที
+</button>
+
+<button class="add" onclick="addTime(600)">
++ 10 นาที
+</button>
+
+<button class="minus" onclick="addTime(-60)">
+- 1 นาที
+</button>
+
+<button class="minus" onclick="addTime(-300)">
+- 5 นาที
+</button>
+
+<button class="toggle" onclick="toggleTimer()">
+หยุด / เล่น
+</button>
+
+<button class="reset" onclick="resetTimer()">
+รีเซ็ต 30 นาที
+</button>
+
+<div id="status">
+กำลังเชื่อมต่อ…
+</div>
+
 <script>
-let ws,sec=1800,running=true,receivedAt=Date.now(),retry=1000;
-function connect(){ws=new WebSocket((location.protocol==="https:"?"wss":"ws")+"://"+location.host+"/ws");ws.onopen=()=>{retry=1000;s.textContent="● เชื่อมต่อแล้ว"};ws.onclose=()=>{s.textContent="กำลังเชื่อมต่อ…";setTimeout(connect,retry);retry=Math.min(retry*2,10000)};ws.onmessage=e=>{let m=JSON.parse(e.data);if(m.type==="state"){sec=m.seconds;running=m.running;receivedAt=Date.now();}}}connect();
-function send(x){if(ws&&ws.readyState===1)ws.send(JSON.stringify(x))}
-document.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>send({type:"add",seconds:Number(b.dataset.n)}));
-reset.onclick=()=>send({type:"reset",seconds:Math.max(0,Number(start.value)||0)*60});
-toggle.onclick=()=>send({type:"toggle"});
-function draw(){let x=sec+(running?Math.floor((Date.now()-receivedAt)/1000):0);x=Math.max(0,x);let m=Math.floor(x/60),q=x%60;t.textContent=String(m).padStart(2,"0")+":"+String(q).padStart(2,"0");toggle.textContent=running?"⏸ หยุดเวลา":"▶ เริ่มเวลา";requestAnimationFrame(draw)}draw();
-</script></body></html>
+
+let ws;
+
+let sec=1800;
+
+let running=true;
+
+let receivedAt=Date.now();
+
+function connect(){
+
+  ws=new WebSocket(
+    (location.protocol==="https:"?"wss":"ws")
+    +"://"+location.host+"/ws"
+  );
+
+  ws.onopen=()=>{
+
+    status.textContent="● เชื่อมต่อแล้ว";
+
+  };
+
+  ws.onclose=()=>{
+
+    status.textContent="กำลังเชื่อมต่อใหม่…";
+
+    setTimeout(connect,1000);
+
+  };
+
+  ws.onmessage=e=>{
+
+    let m=JSON.parse(e.data);
+
+    if(m.type==="state"){
+
+      sec=m.seconds;
+
+      running=m.running;
+
+      receivedAt=Date.now();
+
+    }
+
+  };
+
+}
+
+connect();
+
+function addTime(seconds){
+
+  if(ws && ws.readyState===WebSocket.OPEN){
+
+    ws.send(JSON.stringify({
+
+      type:"add",
+
+      seconds:seconds
+
+    }));
+
+  }
+
+}
+
+function toggleTimer(){
+
+  if(ws && ws.readyState===WebSocket.OPEN){
+
+    ws.send(JSON.stringify({
+
+      type:"toggle"
+
+    }));
+
+  }
+
+}
+
+function resetTimer(){
+
+  if(ws && ws.readyState===WebSocket.OPEN){
+
+    ws.send(JSON.stringify({
+
+      type:"reset",
+
+      seconds:1800
+
+    }));
+
+  }
+
+}
+
+function draw(){
+
+  let x=sec-(running
+    ?Math.floor((Date.now()-receivedAt)/1000)
+    :0);
+
+  x=Math.max(0,x);
+
+  let m=Math.floor(x/60);
+
+  let s=x%60;
+
+  timer.textContent=
+    String(m).padStart(2,"0")
+    +":"
+    +String(s).padStart(2,"0");
+
+  requestAnimationFrame(draw);
+
+}
+
+draw();
+
+</script>
+
+</body>
+</html>
